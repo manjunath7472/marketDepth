@@ -4,6 +4,9 @@ import matplotlib.animation as animation
 from kite_trade import *
 import time
 from collections import deque
+from datetime import datetime
+from pathlib import Path
+import pandas as pd
 
 with open('enctoken.txt', 'r') as wr:
     token = wr.read()
@@ -33,18 +36,40 @@ def calculate_percentage_change(current, previous):
     return pc
 
 global rangei,v1min,v1max,v2min,v2max,v3min,v3max
+
 rangei=0
 
-
+data_buffer = []
+outcsv = R'D:\marketDepthIndi\marketDepth.csv'
 # Combined update function
 def update_raw_data(frame):
     
-    global rangei,v1min,v1max,v2min,v2max,v3min,v3max
+    global rangei,v1min,v1max,v2min,v2max,v3min,v3max,data_buffer
 
     myquote = kite.quote([scriptName])
-    v1.append(float(myquote[scriptName]['buy_quantity']))
-    v2.append(float(myquote[scriptName]['sell_quantity']))
-    v3.append(float(myquote[scriptName]['volume']))
+    curbuy = float(myquote[scriptName]['buy_quantity'])
+    curSell = float(myquote[scriptName]['sell_quantity'])
+    curVol = float(myquote[scriptName]['volume'])
+
+    
+    v1.append(curbuy)
+    v2.append(curSell)
+    v3.append(curVol)
+
+    curTime = datetime.now()
+    data_buffer.append([scriptName,curTime,curbuy,curSell,curVol])
+
+    if len(data_buffer)>3:
+        
+        dataToStoredf = pd.DataFrame(data_buffer,columns=['Script','Cur_Time','BuyQ','SellQ','Vol'])
+        
+        if Path(outcsv).exists():
+            dataToStoredf.to_csv('marketDepth_values.csv',index=False,mode='a',header=False)
+        else:
+            dataToStoredf.to_csv('marketDepth_values.csv',index=False)
+        data_buffer = []
+        
+
 
     # Ensure deques have the same length as x
     len_x = len(x)
@@ -54,7 +79,6 @@ def update_raw_data(frame):
 
     
     # Adding new data to each dataset
-    print(v1_data)
     # Clear the previous plot
     ax1_raw.clear()
     ax2_raw.clear()
@@ -75,7 +99,7 @@ def update_raw_data(frame):
     if v3_data[-1] < v3min or v3_data[-1] > v3max:
         v3min,v3max = giveyrange(v3_data,0.99,1.01)
 
-    print(f'min:{v3min} | max:{v3max}')
+    # print(f'min:{v3min} | max:{v3max}')
     # Plotting raw data for v1, v2, and v3
     ax1_raw.plot(x, v1_data, 'green')
     # ax1_raw.set_ylabel('v1', color='green')
@@ -91,6 +115,10 @@ def update_raw_data(frame):
     # ax3_raw.set_ylabel('v3', color='black')
     # ax3_raw.tick_params(axis='y', labelcolor='black')
     ax3_raw.set_ylim(v3min,v3max)
+
+    
+
+    
 
 
 # Function to update percentage change
@@ -142,7 +170,7 @@ ax2_pc = ax1_pc.twinx()
 ax3_pc = ax1_pc.twinx()
 
 # Creating two separate animations
-ani_raw = animation.FuncAnimation(fig_raw, update_raw_data, interval=1000)
-ani_pc = animation.FuncAnimation(fig_pc, update_percentage_change, interval=1000)
+ani_raw = animation.FuncAnimation(fig_raw, update_raw_data, interval=500)
+ani_pc = animation.FuncAnimation(fig_pc, update_percentage_change, interval=500)
 
 plt.show()
